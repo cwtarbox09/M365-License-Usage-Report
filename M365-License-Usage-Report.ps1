@@ -11,6 +11,7 @@ param(
     [switch]$SkipModuleInstall
 )
 
+Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 function Write-Log {
@@ -115,6 +116,7 @@ function Add-ReportKeyedHashtable {
     $result = @{}
     foreach ($row in $Rows) {
         $key = Get-ReportValue -Row $row -CandidateProperties @($KeyProperty)
+        $key = $row.$KeyProperty
         if (-not [string]::IsNullOrWhiteSpace($key)) {
             $result[$key.ToLowerInvariant()] = $row
         }
@@ -166,6 +168,11 @@ function Get-ReportValue {
 
         if ($fallback) {
             return $fallback.Value
+        }
+    foreach ($name in $CandidateProperties) {
+        $property = $Row.PSObject.Properties[$name]
+        if ($property) {
+            return $property.Value
         }
     }
 
@@ -236,6 +243,8 @@ function New-LicenseUtilizationRows {
                 $mailboxLastActivity = Get-ReportValue -Row $mailboxRow -CandidateProperties @('Last Activity Date','LastActivityDate')
                 $mailboxActive = Test-RecentActivity -DateValue $mailboxLastActivity -LookbackDays 30
                 $evidence.Add("ExchangeLastActivity=$mailboxLastActivity")
+                $mailboxActive = Test-RecentActivity -DateValue $mailboxRow.'Last Activity Date' -LookbackDays 30
+                $evidence.Add("ExchangeLastActivity=$($mailboxRow.'Last Activity Date')")
             }
             else {
                 $mailboxActive = $false
@@ -246,6 +255,8 @@ function New-LicenseUtilizationRows {
                 $oneDriveLastActivity = Get-ReportValue -Row $oneDriveRow -CandidateProperties @('Last Activity Date','LastActivityDate')
                 $oneDriveActive = Test-RecentActivity -DateValue $oneDriveLastActivity -LookbackDays 30
                 $evidence.Add("OneDriveLastActivity=$oneDriveLastActivity")
+                $oneDriveActive = Test-RecentActivity -DateValue $oneDriveRow.'Last Activity Date' -LookbackDays 30
+                $evidence.Add("OneDriveLastActivity=$($oneDriveRow.'Last Activity Date')")
             }
             else {
                 $oneDriveActive = $false
@@ -256,6 +267,8 @@ function New-LicenseUtilizationRows {
                 $teamsLastActivity = Get-ReportValue -Row $teamsRow -CandidateProperties @('Last Activity Date','LastActivityDate')
                 $teamsActive = Test-RecentActivity -DateValue $teamsLastActivity -LookbackDays 30
                 $evidence.Add("TeamsLastActivity=$teamsLastActivity")
+                $teamsActive = Test-RecentActivity -DateValue $teamsRow.'Last Activity Date' -LookbackDays 30
+                $evidence.Add("TeamsLastActivity=$($teamsRow.'Last Activity Date')")
             }
             else {
                 $teamsActive = $false
