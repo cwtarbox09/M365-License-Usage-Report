@@ -233,12 +233,17 @@ function Ensure-Modules {
             Install-Module -Name $module -Scope CurrentUser -Force -AllowClobber -ErrorAction Stop
         }
 
-        Import-Module $module -ErrorAction Stop
+        # Skip re-importing modules already loaded in this session — re-importing
+        # Microsoft.Graph.Authentication clears the current Graph context and triggers
+        # a redundant login prompt on the next API call.
+        if (-not (Get-Module -Name $module)) {
+            Import-Module $module -ErrorAction Stop
+        }
     }
 }
 
 function Connect-M365Graph {
-    $scopes = @(
+    $requiredScopes = @(
         'User.Read.All',
         'Directory.Read.All',
         'DeviceManagementManagedDevices.Read.All',
@@ -246,8 +251,23 @@ function Connect-M365Graph {
         'AuditLog.Read.All'
     )
 
+    # Reuse an existing authenticated session when possible.  Calling
+    # Connect-MgGraph unconditionally always spawns a new browser auth
+    # flow — even when a valid token is already cached — which is the
+    # primary cause of repeated login prompts during a single run.
+    $ctx = Get-MgContext
+    if ($ctx) {
+        $missingScopes = @($requiredScopes | Where-Object { $ctx.Scopes -notcontains $_ })
+        if ($missingScopes.Count -eq 0) {
+            Write-Log "Reusing existing Graph session (tenant: $($ctx.TenantId), account: $($ctx.Account))"
+            return
+        }
+        Write-Log "Existing session is missing required scopes ($($missingScopes -join ', ')). Reconnecting..."
+        Disconnect-MgGraph -ErrorAction SilentlyContinue | Out-Null
+    }
+
     Write-Log 'Connecting to Microsoft Graph. Please sign in with an admin account when prompted.'
-    Connect-MgGraph -Scopes $scopes -NoWelcome
+    Connect-MgGraph -Scopes $requiredScopes -NoWelcome -ErrorAction Stop
 
     $ctx = Get-MgContext
     if (-not $ctx) {
