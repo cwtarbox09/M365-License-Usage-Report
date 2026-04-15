@@ -219,9 +219,12 @@ function Ensure-Modules {
             Write-Log "Installing module: $module"
             Install-Module -Name $module -Scope CurrentUser -Force -AllowClobber -ErrorAction Stop
         }
-
-        Import-Module $module -ErrorAction Stop
     }
+
+    # Import only the authentication module here. The remaining sub-modules are imported
+    # after Connect-M365Graph establishes a session so they inherit the active context
+    # and do not each trigger their own authentication prompt.
+    Import-Module 'Microsoft.Graph.Authentication' -ErrorAction Stop
 }
 
 function Connect-M365Graph {
@@ -232,6 +235,17 @@ function Connect-M365Graph {
         'Reports.Read.All',
         'AuditLog.Read.All'
     )
+
+    # Reuse an existing valid session if it already covers all required scopes,
+    # so the user is never prompted more than once per PowerShell session.
+    $ctx = Get-MgContext -ErrorAction SilentlyContinue
+    if ($ctx -and $ctx.Account) {
+        $missingScopes = $scopes | Where-Object { $ctx.Scopes -notcontains $_ }
+        if ($missingScopes.Count -eq 0) {
+            Write-Log "Reusing existing Microsoft Graph session (tenant: $($ctx.TenantId), account: $($ctx.Account))."
+            return
+        }
+    }
 
     Write-Log 'Connecting to Microsoft Graph. Please sign in with an admin account when prompted.'
     Connect-MgGraph -Scopes $scopes -NoWelcome
@@ -729,6 +743,12 @@ renderDetailTable();
 try {
     Ensure-Modules -SkipInstall:$SkipModuleInstall
     Connect-M365Graph
+
+    # Import remaining Graph sub-modules now that a session is active. Loading them
+    # after authentication prevents each module from issuing its own login prompt.
+    foreach ($module in @('Microsoft.Graph.Users', 'Microsoft.Graph.Identity.DirectoryManagement', 'Microsoft.Graph.DeviceManagement', 'Microsoft.Graph.Reports')) {
+        Import-Module $module -ErrorAction Stop
+    }
 
     Write-Log 'Loading user and license inventory...'
     $users = Get-MgUser -All -Property id,displayName,userPrincipalName,assignedLicenses,accountEnabled |
