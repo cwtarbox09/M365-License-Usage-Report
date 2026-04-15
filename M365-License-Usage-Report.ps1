@@ -215,6 +215,9 @@ function New-LicenseUtilizationRows {
         $teamsRow = $TeamsUsage[$upnLower]
         $intuneDevices = if ($IntuneDeviceCounts.ContainsKey($upnLower)) { $IntuneDeviceCounts[$upnLower] } else { 0 }
 
+        $assignedSkuNames = New-Object System.Collections.Generic.List[string]
+        $allServicePlanNames = New-Object System.Collections.Generic.List[string]
+
         foreach ($license in $user.AssignedLicenses) {
             $skuId = $license.SkuId.ToString()
             if (-not $SkuLookup.ContainsKey($skuId)) {
@@ -222,87 +225,94 @@ function New-LicenseUtilizationRows {
             }
 
             $sku = $SkuLookup[$skuId]
-            $signals = New-Object System.Collections.Generic.List[string]
-            $evidence = New-Object System.Collections.Generic.List[string]
-
-            $hasExchangePlan = $sku.ServicePlans.ServicePlanName -match 'EXCHANGE'
-            $hasSharePointPlan = $sku.ServicePlans.ServicePlanName -match 'SHAREPOINT|ONEDRIVE'
-            $hasTeamsPlan = $sku.ServicePlans.ServicePlanName -match 'TEAMS'
-            $hasIntunePlan = $sku.ServicePlans.ServicePlanName -match 'INTUNE|EMS|AAD_PREMIUM'
-
-            if ($hasExchangePlan) {
-                $signals.Add('Exchange')
-                $mailboxLastActivity = Get-ReportValue -Row $mailboxRow -CandidateProperties @('Last Activity Date','LastActivityDate')
-                $mailboxActive = Test-RecentActivity -DateValue $mailboxLastActivity -LookbackDays 30
-                $evidence.Add("ExchangeLastActivity=$mailboxLastActivity")
+            $assignedSkuNames.Add($sku.SkuPartNumber)
+            foreach ($servicePlan in $sku.ServicePlans) {
+                $allServicePlanNames.Add($servicePlan.ServicePlanName)
             }
-            else {
-                $mailboxActive = $false
-            }
-
-            if ($hasSharePointPlan) {
-                $signals.Add('OneDrive/SharePoint')
-                $oneDriveLastActivity = Get-ReportValue -Row $oneDriveRow -CandidateProperties @('Last Activity Date','LastActivityDate')
-                $oneDriveActive = Test-RecentActivity -DateValue $oneDriveLastActivity -LookbackDays 30
-                $evidence.Add("OneDriveLastActivity=$oneDriveLastActivity")
-            }
-            else {
-                $oneDriveActive = $false
-            }
-
-            if ($hasTeamsPlan) {
-                $signals.Add('Teams')
-                $teamsLastActivity = Get-ReportValue -Row $teamsRow -CandidateProperties @('Last Activity Date','LastActivityDate')
-                $teamsActive = Test-RecentActivity -DateValue $teamsLastActivity -LookbackDays 30
-                $evidence.Add("TeamsLastActivity=$teamsLastActivity")
-            }
-            else {
-                $teamsActive = $false
-            }
-
-            if ($hasIntunePlan) {
-                $signals.Add('Intune')
-                $intuneActive = $intuneDevices -gt 0
-                $evidence.Add("IntuneDevices=$intuneDevices")
-            }
-            else {
-                $intuneActive = $false
-            }
-
-            $checkedSignals = @($mailboxActive, $oneDriveActive, $teamsActive, $intuneActive)
-            $activeSignalCount = @($checkedSignals | Where-Object { $_ }).Count
-            $availableSignalCount = $signals.Count
-
-            $utilizationState = if ($availableSignalCount -eq 0) {
-                'NoTrackedWorkload'
-            }
-            elseif ($activeSignalCount -eq 0) {
-                'Unused'
-            }
-            elseif ($activeSignalCount -lt $availableSignalCount) {
-                'PartiallyUsed'
-            }
-            else {
-                'Used'
-            }
-
-            $outputRows.Add([PSCustomObject]@{
-                DisplayName          = $user.DisplayName
-                UserPrincipalName    = $upn
-                AccountEnabled       = $user.AccountEnabled
-                LicenseSku           = $sku.SkuPartNumber
-                TrackedWorkloads     = ($signals -join '; ')
-                WorkloadSignalsFound = $activeSignalCount
-                WorkloadSignalsTotal = $availableSignalCount
-                UtilizationState     = $utilizationState
-                ExchangeActive       = $mailboxActive
-                OneDriveActive       = $oneDriveActive
-                TeamsActive          = $teamsActive
-                IntuneDeviceCount    = $intuneDevices
-                EvaluationPeriod     = $Period
-                Evidence             = ($evidence -join '; ')
-            })
         }
+
+        $hasExchangePlan = $allServicePlanNames -match 'EXCHANGE'
+        $hasSharePointPlan = $allServicePlanNames -match 'SHAREPOINT|ONEDRIVE'
+        $hasTeamsPlan = $allServicePlanNames -match 'TEAMS'
+        $hasIntunePlan = $allServicePlanNames -match 'INTUNE|EMS|AAD_PREMIUM'
+
+        $signals = New-Object System.Collections.Generic.List[string]
+        $evidence = New-Object System.Collections.Generic.List[string]
+
+        if ($hasExchangePlan) {
+            $signals.Add('Exchange')
+            $mailboxLastActivity = Get-ReportValue -Row $mailboxRow -CandidateProperties @('Last Activity Date','LastActivityDate')
+            $mailboxActive = Test-RecentActivity -DateValue $mailboxLastActivity -LookbackDays 30
+            $evidence.Add("ExchangeLastActivity=$mailboxLastActivity")
+        }
+        else {
+            $mailboxActive = $false
+        }
+
+        if ($hasSharePointPlan) {
+            $signals.Add('OneDrive/SharePoint')
+            $oneDriveLastActivity = Get-ReportValue -Row $oneDriveRow -CandidateProperties @('Last Activity Date','LastActivityDate')
+            $oneDriveActive = Test-RecentActivity -DateValue $oneDriveLastActivity -LookbackDays 30
+            $evidence.Add("OneDriveLastActivity=$oneDriveLastActivity")
+        }
+        else {
+            $oneDriveActive = $false
+        }
+
+        if ($hasTeamsPlan) {
+            $signals.Add('Teams')
+            $teamsLastActivity = Get-ReportValue -Row $teamsRow -CandidateProperties @('Last Activity Date','LastActivityDate')
+            $teamsActive = Test-RecentActivity -DateValue $teamsLastActivity -LookbackDays 30
+            $evidence.Add("TeamsLastActivity=$teamsLastActivity")
+        }
+        else {
+            $teamsActive = $false
+        }
+
+        if ($hasIntunePlan) {
+            $signals.Add('Intune')
+            $intuneActive = $intuneDevices -gt 0
+            $evidence.Add("IntuneDevices=$intuneDevices")
+        }
+        else {
+            $intuneActive = $false
+        }
+
+        $checkedSignals = @($mailboxActive, $oneDriveActive, $teamsActive, $intuneActive)
+        $activeSignalCount = @($checkedSignals | Where-Object { $_ }).Count
+        $availableSignalCount = $signals.Count
+        $distinctSkuNames = $assignedSkuNames | Sort-Object -Unique
+
+        $utilizationState = if ($availableSignalCount -eq 0) {
+            'NoTrackedWorkload'
+        }
+        elseif ($activeSignalCount -eq 0) {
+            'Unused'
+        }
+        elseif ($activeSignalCount -lt $availableSignalCount) {
+            'PartiallyUsed'
+        }
+        else {
+            'Used'
+        }
+
+        $outputRows.Add([PSCustomObject]@{
+            DisplayName          = $user.DisplayName
+            UserPrincipalName    = $upn
+            AccountEnabled       = $user.AccountEnabled
+            AssignedSkuCount     = $distinctSkuNames.Count
+            AssignedSkus         = ($distinctSkuNames -join '; ')
+            TrackedWorkloads     = ($signals -join '; ')
+            WorkloadSignalsFound = $activeSignalCount
+            WorkloadSignalsTotal = $availableSignalCount
+            UtilizationState     = $utilizationState
+            ExchangeActive       = $mailboxActive
+            OneDriveActive       = $oneDriveActive
+            TeamsActive          = $teamsActive
+            IntuneDeviceCount    = $intuneDevices
+            EvaluationPeriod     = $Period
+            Evidence             = ($evidence -join '; ')
+        })
     }
 
     return $outputRows
@@ -324,13 +334,17 @@ function Export-ReportFiles {
     $htmlPath = Join-Path -Path $Folder -ChildPath "M365_License_Utilization_$timestamp.html"
 
     if ($Format -in @('Csv','Both')) {
-        $Rows | Sort-Object UtilizationState,LicenseSku,UserPrincipalName | Export-Csv -Path $csvPath -NoTypeInformation -Encoding UTF8
+        $Rows | Sort-Object UtilizationState,UserPrincipalName | Export-Csv -Path $csvPath -NoTypeInformation -Encoding UTF8
         Write-Log "CSV report written: $csvPath"
     }
 
     if ($Format -in @('Html','Both')) {
         $summaryByState = $Rows | Group-Object UtilizationState | Sort-Object Name
-        $summaryBySku = $Rows | Group-Object LicenseSku | Sort-Object Count -Descending
+        $summaryBySku = $Rows |
+            ForEach-Object { ($_.AssignedSkus -split '; ') } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            Group-Object |
+            Sort-Object Count -Descending
 
         $style = @'
 <style>
@@ -350,13 +364,13 @@ tr:nth-child(even) { background-color: #f9fbff; }
         $summaryHtml += ($summaryBySku | Select-Object Name,Count | ConvertTo-Html -Fragment)
 
         $detailHtml = $Rows |
-            Sort-Object UtilizationState,LicenseSku,UserPrincipalName |
+            Sort-Object UtilizationState,UserPrincipalName |
             ConvertTo-Html -Fragment
 
         $bodySections = @(
             "<h1>M365 License Utilization Report</h1>",
             "<p>Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')</p>",
-            "<p>Total License Assignments Evaluated: $($Rows.Count)</p>",
+            "<p>Total Licensed Users Evaluated: $($Rows.Count)</p>",
             ($summaryHtml -join "`n"),
             '<h2>Detailed Results</h2>',
             ($detailHtml -join "`n")
