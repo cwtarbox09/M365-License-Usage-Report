@@ -281,7 +281,7 @@ function New-LicenseUtilizationRows {
         $checkedSignals = @($mailboxActive, $oneDriveActive, $teamsActive, $intuneActive)
         $activeSignalCount = @($checkedSignals | Where-Object { $_ }).Count
         $availableSignalCount = $signals.Count
-        $distinctSkuNames = $assignedSkuNames | Sort-Object -Unique
+        $distinctSkuNames = @($assignedSkuNames | Sort-Object -Unique)
 
         $utilizationState = if ($availableSignalCount -eq 0) {
             'NoTrackedWorkload'
@@ -300,7 +300,7 @@ function New-LicenseUtilizationRows {
             DisplayName          = $user.DisplayName
             UserPrincipalName    = $upn
             AccountEnabled       = $user.AccountEnabled
-            AssignedSkuCount     = $distinctSkuNames.Count
+            AssignedSkuCount     = @($distinctSkuNames).Count
             AssignedSkus         = ($distinctSkuNames -join '; ')
             TrackedWorkloads     = ($signals -join '; ')
             WorkloadSignalsFound = $activeSignalCount
