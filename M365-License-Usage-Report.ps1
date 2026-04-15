@@ -455,10 +455,10 @@ tr:hover td { background: #f9fbff; }
 </style>
 '@
 
-        $script = @"
+        $scriptTemplate = @'
 <script>
-const reportRows = $rowsJson;
-const exportTimestamp = "$(Get-Date -Format 'yyyyMMdd_HHmmss')";
+const reportRows = __ROWS_JSON__;
+const exportTimestamp = "__EXPORT_TIMESTAMP__";
 
 function getStateClass(state) {
   const normalized = (state || '').toLowerCase();
@@ -512,7 +512,10 @@ function downloadCsv() {
 
 renderDetailTable();
 </script>
-"@
+'@
+        $script = $scriptTemplate.
+            Replace('__ROWS_JSON__', $rowsJson).
+            Replace('__EXPORT_TIMESTAMP__', (Get-Date -Format 'yyyyMMdd_HHmmss'))
 
         $bodySections = @(
             '<div class="container">',
