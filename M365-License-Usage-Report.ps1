@@ -22,7 +22,6 @@ function Write-Log {
         [string]$Level = 'INFO'
     )
 
-    Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] [$Level] $Message"
     $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
     Write-Host "[$timestamp] [$Level] $Message"
 }
@@ -30,7 +29,6 @@ function Write-Log {
 function Ensure-Modules {
     param([switch]$SkipInstall)
 
-    $modules = @(
     $requiredModules = @(
         'Microsoft.Graph.Authentication',
         'Microsoft.Graph.Users',
@@ -39,18 +37,6 @@ function Ensure-Modules {
         'Microsoft.Graph.Reports'
     )
 
-    foreach ($moduleName in $modules) {
-        $installed = Get-Module -ListAvailable -Name $moduleName
-        if (-not $installed) {
-            if ($SkipInstall) {
-                throw "Required module '$moduleName' is missing and -SkipModuleInstall was used."
-            }
-
-            Write-Log "Installing module $moduleName"
-            Install-Module -Name $moduleName -Scope CurrentUser -AllowClobber -Force
-        }
-
-        Import-Module -Name $moduleName -ErrorAction Stop
     foreach ($module in $requiredModules) {
         if (-not (Get-Module -ListAvailable -Name $module)) {
             if ($SkipInstall) {
@@ -83,25 +69,12 @@ function Connect-M365Graph {
     }
 
     Write-Log "Connected to tenant $($ctx.TenantId) as $($ctx.Account)"
-    Write-Log 'Connecting to Microsoft Graph. Sign in with a Microsoft 365 admin account when prompted.'
-    Connect-MgGraph -Scopes $scopes -NoWelcome
-
-    $context = Get-MgContext
-    if (-not $context) {
-        throw 'Microsoft Graph connection failed.'
-    }
-
-    Write-Log "Connected to tenant: $($context.TenantId) as account: $($context.Account)"
 }
 
 function Get-GraphReportData {
     param(
         [Parameter(Mandatory)][string]$Endpoint,
         [Parameter(Mandatory)][string]$TempFile
-        [Parameter(Mandatory)]
-        [string]$Endpoint,
-        [Parameter(Mandatory)]
-        [string]$TempFile
     )
 
     Invoke-MgGraphRequest -Method GET -Uri $Endpoint -OutputFilePath $TempFile
@@ -141,7 +114,6 @@ function Add-ReportKeyedHashtable {
     $result = @{}
     foreach ($row in $Rows) {
         $key = Get-ReportValue -Row $row -CandidateProperties @($KeyProperty)
-        $key = $row.$KeyProperty
         if (-not [string]::IsNullOrWhiteSpace($key)) {
             $result[$key.ToLowerInvariant()] = $row
         }
@@ -193,11 +165,6 @@ function Get-ReportValue {
 
         if ($fallback) {
             return $fallback.Value
-        }
-    foreach ($name in $CandidateProperties) {
-        $property = $Row.PSObject.Properties[$name]
-        if ($property) {
-            return $property.Value
         }
     }
 
@@ -268,8 +235,6 @@ function New-LicenseUtilizationRows {
                 $mailboxLastActivity = Get-ReportValue -Row $mailboxRow -CandidateProperties @('Last Activity Date','LastActivityDate')
                 $mailboxActive = Test-RecentActivity -DateValue $mailboxLastActivity -LookbackDays 30
                 $evidence.Add("ExchangeLastActivity=$mailboxLastActivity")
-                $mailboxActive = Test-RecentActivity -DateValue $mailboxRow.'Last Activity Date' -LookbackDays 30
-                $evidence.Add("ExchangeLastActivity=$($mailboxRow.'Last Activity Date')")
             }
             else {
                 $mailboxActive = $false
@@ -280,8 +245,6 @@ function New-LicenseUtilizationRows {
                 $oneDriveLastActivity = Get-ReportValue -Row $oneDriveRow -CandidateProperties @('Last Activity Date','LastActivityDate')
                 $oneDriveActive = Test-RecentActivity -DateValue $oneDriveLastActivity -LookbackDays 30
                 $evidence.Add("OneDriveLastActivity=$oneDriveLastActivity")
-                $oneDriveActive = Test-RecentActivity -DateValue $oneDriveRow.'Last Activity Date' -LookbackDays 30
-                $evidence.Add("OneDriveLastActivity=$($oneDriveRow.'Last Activity Date')")
             }
             else {
                 $oneDriveActive = $false
@@ -292,8 +255,6 @@ function New-LicenseUtilizationRows {
                 $teamsLastActivity = Get-ReportValue -Row $teamsRow -CandidateProperties @('Last Activity Date','LastActivityDate')
                 $teamsActive = Test-RecentActivity -DateValue $teamsLastActivity -LookbackDays 30
                 $evidence.Add("TeamsLastActivity=$teamsLastActivity")
-                $teamsActive = Test-RecentActivity -DateValue $teamsRow.'Last Activity Date' -LookbackDays 30
-                $evidence.Add("TeamsLastActivity=$($teamsRow.'Last Activity Date')")
             }
             else {
                 $teamsActive = $false
