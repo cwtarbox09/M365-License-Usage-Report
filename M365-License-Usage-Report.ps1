@@ -60,6 +60,18 @@ function Connect-M365Graph {
         'AuditLog.Read.All'
     )
 
+    # Reuse an existing session if it already has all required scopes
+    $ctx = Get-MgContext
+    if ($ctx) {
+        $missingScopes = $scopes | Where-Object { $ctx.Scopes -notcontains $_ }
+        if (-not $missingScopes) {
+            Write-Log "Reusing existing Graph session (tenant: $($ctx.TenantId), account: $($ctx.Account))"
+            return
+        }
+        # Existing session lacks required scopes — disconnect cleanly before re-authenticating
+        Disconnect-MgGraph -ErrorAction SilentlyContinue | Out-Null
+    }
+
     Write-Log 'Connecting to Microsoft Graph. Please sign in with an admin account when prompted.'
     Connect-MgGraph -Scopes $scopes -NoWelcome
 
