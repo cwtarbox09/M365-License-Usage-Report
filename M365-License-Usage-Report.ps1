@@ -231,10 +231,10 @@ function New-LicenseUtilizationRows {
             }
         }
 
-        $hasExchangePlan = $allServicePlanNames -match 'EXCHANGE'
+        $hasExchangePlan = $allServicePlanNames -match 'EXCHANGE_S_STANDARD|EXCHANGE_S_ENTERPRISE|EXCHANGE_S_DESKLESS|EXCHANGE_S_ESSENTIALS'
         $hasSharePointPlan = $allServicePlanNames -match 'SHAREPOINT|ONEDRIVE'
         $hasTeamsPlan = $allServicePlanNames -match 'TEAMS'
-        $hasIntunePlan = $allServicePlanNames -match 'INTUNE|EMS|AAD_PREMIUM'
+        $hasIntunePlan = $allServicePlanNames -match 'INTUNE'
 
         $signals = New-Object System.Collections.Generic.List[string]
         $evidence = New-Object System.Collections.Generic.List[string]
