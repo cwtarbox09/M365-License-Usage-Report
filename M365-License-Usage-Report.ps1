@@ -346,34 +346,201 @@ function Export-ReportFiles {
             Group-Object |
             Sort-Object Count -Descending
 
+        $rowsForExport = $Rows | Sort-Object UtilizationState,UserPrincipalName
+        $rowsJson = $rowsForExport | ConvertTo-Json -Depth 5 -Compress
+        $summaryStateRows = ($summaryByState | Select-Object Name,Count | ConvertTo-Html -Fragment)
+        $summarySkuRows = ($summaryBySku | Select-Object Name,Count | ConvertTo-Html -Fragment)
+
         $style = @'
 <style>
-body { font-family: Segoe UI, Arial, sans-serif; margin: 20px; }
-h1, h2 { color: #0b3d91; }
-table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
-th, td { border: 1px solid #ddd; padding: 8px; }
-th { background-color: #f4f6fa; text-align: left; }
-tr:nth-child(even) { background-color: #f9fbff; }
+* { box-sizing: border-box; }
+body {
+    font-family: "Segoe UI", "Inter", Arial, sans-serif;
+    margin: 0;
+    background: linear-gradient(180deg, #f5f7fb 0%, #eef3fb 100%);
+    color: #162238;
+}
+.container {
+    max-width: 1300px;
+    margin: 0 auto;
+    padding: 24px;
+}
+.hero {
+    background: linear-gradient(135deg, #0b3d91 0%, #245abf 100%);
+    color: #fff;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 16px 40px rgba(11, 61, 145, 0.25);
+}
+.hero h1 { margin: 0 0 8px; font-size: 28px; }
+.hero p { margin: 0; opacity: 0.95; }
+.stats {
+    margin-top: 16px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+}
+.stat-card {
+    background: rgba(255,255,255,0.14);
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 12px;
+    padding: 14px;
+}
+.stat-label { font-size: 12px; opacity: 0.9; text-transform: uppercase; letter-spacing: 0.4px; }
+.stat-value { font-size: 28px; font-weight: 700; margin-top: 4px; }
+.section-card {
+    margin-top: 20px;
+    background: #ffffff;
+    border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    border: 1px solid #e4e9f4;
+    padding: 18px;
+}
+.section-title {
+    margin: 0 0 14px;
+    color: #0f2f66;
+    font-size: 20px;
+}
+.toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 10px;
+}
+.btn {
+    border: none;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-weight: 600;
+    cursor: pointer;
+    background: #2563eb;
+    color: #fff;
+}
+.btn:hover { background: #1d4ed8; }
+.table-wrap {
+    overflow: auto;
+    border-radius: 12px;
+    border: 1px solid #e5eaf5;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+}
+th, td {
+    padding: 10px;
+    border-bottom: 1px solid #edf1f9;
+    text-align: left;
+    vertical-align: top;
+    font-size: 13px;
+}
+th {
+    position: sticky;
+    top: 0;
+    background: #f2f6ff;
+    color: #1b376d;
+    font-weight: 700;
+}
+tr:hover td { background: #f9fbff; }
+.badge {
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-weight: 700;
+    display: inline-block;
+    font-size: 12px;
+}
+.state-used { background: #dcfce7; color: #166534; }
+.state-partiallyused { background: #fef3c7; color: #92400e; }
+.state-unused { background: #fee2e2; color: #991b1b; }
+.state-notrackedworkload { background: #e5e7eb; color: #374151; }
 </style>
 '@
 
-        $summaryHtml = @()
-        $summaryHtml += '<h2>Summary by Utilization State</h2>'
-        $summaryHtml += ($summaryByState | Select-Object Name,Count | ConvertTo-Html -Fragment)
-        $summaryHtml += '<h2>Top License SKUs by Assignment Count</h2>'
-        $summaryHtml += ($summaryBySku | Select-Object Name,Count | ConvertTo-Html -Fragment)
+        $script = @"
+<script>
+const reportRows = $rowsJson;
+const exportTimestamp = "$(Get-Date -Format 'yyyyMMdd_HHmmss')";
 
-        $detailHtml = $Rows |
-            Sort-Object UtilizationState,UserPrincipalName |
-            ConvertTo-Html -Fragment
+function getStateClass(state) {
+  const normalized = (state || '').toLowerCase();
+  return `state-${normalized}`;
+}
+
+function renderDetailTable() {
+  const columns = [
+    'DisplayName','UserPrincipalName','AccountEnabled','AssignedSkuCount','AssignedSkus','TrackedWorkloads',
+    'WorkloadSignalsFound','WorkloadSignalsTotal','UtilizationState','ExchangeActive','OneDriveActive',
+    'TeamsActive','IntuneDeviceCount','EvaluationPeriod','Evidence'
+  ];
+
+  const header = columns.map(c => `<th>${c}</th>`).join('');
+  const rows = reportRows.map(row => {
+    return `<tr>${columns.map(col => {
+      let value = row[col];
+      if (col === 'UtilizationState') {
+        return `<td><span class="badge ${getStateClass(value)}">${value ?? ''}</span></td>`;
+      }
+      if (value === null || value === undefined) value = '';
+      return `<td>${String(value)}</td>`;
+    }).join('')}</tr>`;
+  }).join('');
+
+  document.getElementById('detailTable').innerHTML =
+    `<thead><tr>${header}</tr></thead><tbody>${rows}</tbody>`;
+}
+
+function downloadCsv() {
+  if (!reportRows.length) return;
+  const columns = Object.keys(reportRows[0]);
+  const escapeCsv = (value) => {
+    const str = value === null || value === undefined ? '' : String(value);
+    return /[",\n]/.test(str) ? '"' + str.replace(/"/g, '""') + '"' : str;
+  };
+  const csv = [
+    columns.join(','),
+    ...reportRows.map(r => columns.map(c => escapeCsv(r[c])).join(','))
+  ].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `M365_License_Utilization_${exportTimestamp}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+renderDetailTable();
+</script>
+"@
 
         $bodySections = @(
-            "<h1>M365 License Utilization Report</h1>",
+            '<div class="container">',
+            '<section class="hero">',
+            '<h1>M365 License Utilization Report</h1>',
             "<p>Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')</p>",
-            "<p>Total Licensed Users Evaluated: $($Rows.Count)</p>",
-            ($summaryHtml -join "`n"),
-            '<h2>Detailed Results</h2>',
-            ($detailHtml -join "`n")
+            '<div class="stats">',
+            '<div class="stat-card"><div class="stat-label">Total Licensed Users</div>',
+            "<div class='stat-value'>$($Rows.Count)</div></div>",
+            '<div class="stat-card"><div class="stat-label">States Tracked</div>',
+            "<div class='stat-value'>$($summaryByState.Count)</div></div>",
+            '</div>',
+            '</section>',
+            '<section class="section-card">',
+            '<h2 class="section-title">Summary by Utilization State</h2>',
+            ($summaryStateRows -join "`n"),
+            '</section>',
+            '<section class="section-card">',
+            '<h2 class="section-title">Top License SKUs by Assignment Count</h2>',
+            ($summarySkuRows -join "`n"),
+            '</section>',
+            '<section class="section-card">',
+            '<div class="toolbar"><button class="btn" onclick="downloadCsv()">Export details to CSV</button></div>',
+            '<h2 class="section-title">Detailed Results</h2>',
+            '<div class="table-wrap"><table id="detailTable"></table></div>',
+            '</section>',
+            $script,
+            '</div>'
         )
         $fullHtml = ConvertTo-Html -Title 'M365 License Utilization Report' -Head $style -Body ($bodySections -join "`n")
 
