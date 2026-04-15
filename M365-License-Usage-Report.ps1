@@ -177,6 +177,19 @@ $script:LicenseDisplayNames = @{
     'VIVA_INSIGHTS_P1'                          = 'Microsoft Viva Insights'
 }
 
+# SKU part numbers for licenses that include Microsoft Intune.
+# Only these SKUs trigger Intune signal detection.
+$script:IntuneBearingSkus = [System.Collections.Generic.HashSet[string]]@(
+    # Microsoft 365 Business Premium
+    'SPB', 'SMB_BUSINESS_PREMIUM', 'O365_BUSINESS_PREMIUM',
+    # Microsoft 365 E3 / E5
+    'SPE_E3', 'SPE_E3_RPA1', 'SPE_E5', 'SPE_E5_CALLINGMINUTES',
+    # Enterprise Mobility + Security E3 / E5
+    'EMS', 'EMSPREMIUM',
+    # Microsoft Intune standalone
+    'INTUNE_A', 'INTUNE_A_D', 'INTUNE_SMB'
+)
+
 function Get-LicenseFriendlyName {
     param([Parameter(Mandatory)][string]$SkuPartNumber)
 
@@ -390,6 +403,7 @@ function New-LicenseUtilizationRows {
         $intuneDevices = if ($IntuneDeviceCounts.ContainsKey($upnLower)) { $IntuneDeviceCounts[$upnLower] } else { 0 }
 
         $assignedSkuNames = New-Object System.Collections.Generic.List[string]
+        $assignedSkuPartNumbers = New-Object System.Collections.Generic.List[string]
         $allServicePlanNames = New-Object System.Collections.Generic.List[string]
 
         foreach ($license in $user.AssignedLicenses) {
@@ -400,6 +414,7 @@ function New-LicenseUtilizationRows {
 
             $sku = $SkuLookup[$skuId]
             $assignedSkuNames.Add($sku.DisplayName)
+            $assignedSkuPartNumbers.Add($sku.SkuPartNumber)
             foreach ($servicePlan in $sku.ServicePlans) {
                 $allServicePlanNames.Add($servicePlan.ServicePlanName)
             }
@@ -408,7 +423,7 @@ function New-LicenseUtilizationRows {
         $hasExchangePlan = $allServicePlanNames -match 'EXCHANGE_S_STANDARD|EXCHANGE_S_ENTERPRISE|EXCHANGE_S_DESKLESS|EXCHANGE_S_ESSENTIALS'
         $hasSharePointPlan = $allServicePlanNames -match 'SHAREPOINT|ONEDRIVE'
         $hasTeamsPlan = $allServicePlanNames -match 'TEAMS'
-        $hasIntunePlan = $allServicePlanNames -match 'INTUNE'
+        $hasIntunePlan = $assignedSkuPartNumbers | Where-Object { $script:IntuneBearingSkus.Contains($_) }
 
         $signals = New-Object System.Collections.Generic.List[string]
         $evidence = New-Object System.Collections.Generic.List[string]
