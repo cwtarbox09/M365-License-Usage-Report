@@ -353,14 +353,15 @@ tr:nth-child(even) { background-color: #f9fbff; }
             Sort-Object UtilizationState,LicenseSku,UserPrincipalName |
             ConvertTo-Html -Fragment
 
-        $fullHtml = ConvertTo-Html -Title 'M365 License Utilization Report' -Head $style -Body @(
+        $bodySections = @(
             "<h1>M365 License Utilization Report</h1>",
             "<p>Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')</p>",
             "<p>Total License Assignments Evaluated: $($Rows.Count)</p>",
             ($summaryHtml -join "`n"),
             '<h2>Detailed Results</h2>',
-            $detailHtml
+            ($detailHtml -join "`n")
         )
+        $fullHtml = ConvertTo-Html -Title 'M365 License Utilization Report' -Head $style -Body ($bodySections -join "`n")
 
         $fullHtml | Out-File -Path $htmlPath -Encoding UTF8
         Write-Log "HTML report written: $htmlPath"
