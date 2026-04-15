@@ -132,8 +132,8 @@ function Test-RecentActivity {
         return $false
     }
 
-    $parsedDate = $null
-    if (-not [DateTime]::TryParse($DateValue.ToString(), [ref]$parsedDate)) {
+    $parsedDate = $DateValue -as [datetime]
+    if ($null -eq $parsedDate) {
         return $false
     }
 
@@ -270,7 +270,7 @@ function New-LicenseUtilizationRows {
             }
 
             $checkedSignals = @($mailboxActive, $oneDriveActive, $teamsActive, $intuneActive)
-            $activeSignalCount = ($checkedSignals | Where-Object { $_ }).Count
+            $activeSignalCount = @($checkedSignals | Where-Object { $_ }).Count
             $availableSignalCount = $signals.Count
 
             $utilizationState = if ($availableSignalCount -eq 0) {
