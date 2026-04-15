@@ -64,3 +64,7 @@ The script uses **interactive delegated authentication** with `Connect-MgGraph`,
 - CSV report: `M365_License_Utilization_<timestamp>.csv`
 
 Both are written to the selected output folder.
+
+### HTML report experience
+
+The HTML report now includes a modernized dashboard layout and an **Export details to CSV** button so you can download the detailed table directly from the report UI.
