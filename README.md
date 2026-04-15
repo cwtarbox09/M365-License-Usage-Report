@@ -4,14 +4,14 @@ This repository contains a PowerShell script that builds a Microsoft 365 license
 
 ## What it checks
 
-For each licensed user and assigned SKU, the script inspects service plans and checks usage signals:
+For each licensed user, the script aggregates all assigned SKUs, inspects the combined service plans, and checks usage signals:
 
 - **Intune-related plans** (`INTUNE`, `EMS`, `AAD_PREMIUM`): user has one or more Intune managed devices.
 - **Exchange plans**: mailbox activity in the selected reporting period.
 - **OneDrive/SharePoint plans**: OneDrive account activity in the selected reporting period.
 - **Teams plans**: Teams activity in the selected reporting period.
 
-A utilization state is computed per user+license assignment:
+A utilization state is computed per user:
 
 - `Used`
 - `PartiallyUsed`
