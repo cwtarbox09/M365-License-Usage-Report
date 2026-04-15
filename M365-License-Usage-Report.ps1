@@ -14,6 +14,179 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+# Mapping of SKU part numbers to human-readable Microsoft 365 product display names.
+# Falls back to the raw SkuPartNumber for any unlisted SKU.
+$script:LicenseDisplayNames = @{
+    # Microsoft 365 Enterprise
+    'SPE_E3'                                    = 'Microsoft 365 E3'
+    'SPE_E5'                                    = 'Microsoft 365 E5'
+    'SPE_E3_RPA1'                               = 'Microsoft 365 E3 (with Power Automate)'
+    'SPE_E5_CALLINGMINUTES'                     = 'Microsoft 365 E5 (with Calling Minutes)'
+
+    # Microsoft 365 Business
+    'SPB'                                       = 'Microsoft 365 Business Premium'
+    'SMB_BUSINESS_PREMIUM'                      = 'Microsoft 365 Business Premium'
+    'O365_BUSINESS_PREMIUM'                     = 'Microsoft 365 Business Premium'
+    'O365_BUSINESS_ESSENTIALS'                  = 'Microsoft 365 Business Basic'
+    'SMB_BUSINESS_ESSENTIALS'                   = 'Microsoft 365 Business Basic'
+    'O365_BUSINESS'                             = 'Microsoft 365 Apps for Business'
+    'SMB_BUSINESS'                              = 'Microsoft 365 Apps for Business'
+
+    # Microsoft 365 Frontline Workers
+    'SPE_F1'                                    = 'Microsoft 365 F1'
+    'M365_F1'                                   = 'Microsoft 365 F1'
+    'M365_F3'                                   = 'Microsoft 365 F3'
+
+    # Microsoft 365 Education
+    'M365EDU_A1'                                = 'Microsoft 365 A1'
+    'M365EDU_A3_FACULTY'                        = 'Microsoft 365 A3 for Faculty'
+    'M365EDU_A3_STUDENT'                        = 'Microsoft 365 A3 for Students'
+    'M365EDU_A5_FACULTY'                        = 'Microsoft 365 A5 for Faculty'
+    'M365EDU_A5_STUDENT'                        = 'Microsoft 365 A5 for Students'
+
+    # Office 365
+    'STANDARDPACK'                              = 'Office 365 E1'
+    'STANDARDWOFFPACK'                          = 'Office 365 E2'
+    'ENTERPRISEPACK'                            = 'Office 365 E3'
+    'ENTERPRISEWITHSCAL'                        = 'Office 365 E4'
+    'ENTERPRISEPREMIUM'                         = 'Office 365 E5'
+    'ENTERPRISEPREMIUM_NOPSTNCONF'              = 'Office 365 E5 (without Audio Conferencing)'
+    'DESKLESSPACK'                              = 'Office 365 F3'
+    'DESKLESSWOFFPACK'                          = 'Office 365 F1'
+    'ENTERPRISEPACKWITHOUTPROPLUS'              = 'Office 365 E3 (No Apps)'
+
+    # Office 365 Education
+    'STANDARDWOFFPACK_FACULTY'                  = 'Office 365 Education A1 for Faculty'
+    'STANDARDWOFFPACK_STUDENT'                  = 'Office 365 Education A1 for Students'
+    'STANDARDPACK_FACULTY'                      = 'Office 365 Education A1 for Faculty'
+    'STANDARDPACK_STUDENT'                      = 'Office 365 Education A1 for Students'
+    'O365_EDUCATION_E1'                         = 'Office 365 Education E1'
+    'O365_EDUCATION_E3_FACULTY'                 = 'Office 365 Education E3 for Faculty'
+
+    # Microsoft 365 Apps
+    'OFFICESUBSCRIPTION'                        = 'Microsoft 365 Apps for Enterprise'
+    'OFFICESUBSCRIPTION_FACULTY'                = 'Microsoft 365 Apps for Faculty'
+    'OFFICESUBSCRIPTION_STUDENT'                = 'Microsoft 365 Apps for Students'
+
+    # Exchange Online
+    'EXCHANGESTANDARD'                          = 'Exchange Online Plan 1'
+    'EXCHANGEENTERPRISE'                        = 'Exchange Online Plan 2'
+    'EXCHANGE_S_DESKLESS'                       = 'Exchange Online Kiosk'
+    'EXCHANGEDESKLESS'                          = 'Exchange Online Kiosk'
+    'EXCHANGEARCHIVE_ADDON'                     = 'Exchange Online Archiving'
+    'EXCHANGEESSENTIALS'                        = 'Exchange Online Essentials'
+    'EXCHANGE_B_STANDARD'                       = 'Exchange Online Plan 1'
+
+    # SharePoint Online
+    'SHAREPOINTSTANDARD'                        = 'SharePoint Online Plan 1'
+    'SHAREPOINTENTERPRISE'                      = 'SharePoint Online Plan 2'
+
+    # OneDrive for Business
+    'ONEDRIVE_BASIC'                            = 'OneDrive for Business Plan 1'
+    'WACONEDRIVESTANDARD'                       = 'OneDrive for Business with Office Online'
+
+    # Microsoft Teams / Skype
+    'MCOSTANDARD'                               = 'Skype for Business Online Plan 2'
+    'MCOMEETADV'                                = 'Microsoft 365 Audio Conferencing'
+    'TEAMS_EXPLORATORY'                         = 'Microsoft Teams Exploratory'
+    'TEAMS_FREE'                                = 'Microsoft Teams (Free)'
+    'Teams_Room_Standard'                       = 'Microsoft Teams Rooms Standard'
+    'Teams_Room_Pro'                            = 'Microsoft Teams Rooms Pro'
+    'MCOEV'                                     = 'Microsoft 365 Phone System'
+    'MCOEV_DOD'                                 = 'Microsoft 365 Phone System for DoD'
+    'MCOPSTN1'                                  = 'Microsoft 365 Domestic Calling Plan'
+    'MCOPSTN2'                                  = 'Microsoft 365 International Calling Plan'
+    'MCOPSTNCAP'                                = 'Microsoft 365 Communications Credits'
+    'PHONESYSTEM_VIRTUALUSER'                   = 'Microsoft Teams Phone Resource Account'
+
+    # Microsoft Defender / Security
+    'ATP_ENTERPRISE'                            = 'Microsoft Defender for Office 365 Plan 1'
+    'THREAT_INTELLIGENCE'                       = 'Microsoft Defender for Office 365 Plan 2'
+    'IDENTITY_THREAT_PROTECTION'                = 'Microsoft 365 E5 Security'
+    'IDENTITY_THREAT_PROTECTION_FOR_EMS_E5'     = 'Microsoft 365 E5 Security for EMS E5'
+    'INFORMATION_PROTECTION_COMPLIANCE'         = 'Microsoft 365 E5 Compliance'
+    'ATA'                                       = 'Microsoft Defender for Identity'
+    'MDATP'                                     = 'Microsoft Defender for Endpoint P2'
+    'WIN_DEF_ATP'                               = 'Microsoft Defender for Endpoint P1'
+
+    # Enterprise Mobility + Security
+    'EMS'                                       = 'Enterprise Mobility + Security E3'
+    'EMSPREMIUM'                                = 'Enterprise Mobility + Security E5'
+
+    # Microsoft Intune
+    'INTUNE_A'                                  = 'Microsoft Intune Plan 1'
+    'INTUNE_A_D'                                = 'Microsoft Intune Plan 1 for Education'
+    'INTUNE_SMB'                                = 'Microsoft Intune SMB'
+
+    # Microsoft Entra ID (formerly Azure AD)
+    'AAD_PREMIUM'                               = 'Microsoft Entra ID P1'
+    'AAD_PREMIUM_P2'                            = 'Microsoft Entra ID P2'
+    'AAD_SMB'                                   = 'Microsoft Entra ID P1 (SMB)'
+
+    # Power Platform
+    'POWER_BI_STANDARD'                         = 'Power BI (Free)'
+    'POWER_BI_PRO'                              = 'Power BI Pro'
+    'POWER_BI_PREMIUM_PER_USER'                 = 'Power BI Premium Per User'
+    'POWERAPPS_INDIVIDUAL_USER'                 = 'Microsoft Power Apps Plan 2 Trial'
+    'POWERAPPS_VIRAL'                           = 'Microsoft Power Apps Plan 2 Trial'
+    'FLOW_FREE'                                 = 'Power Automate Free'
+    'POWERFLOW_P1'                              = 'Power Automate Premium'
+    'POWERFLOW_P2'                              = 'Power Automate Process'
+    'POWER_VIRTUAL_AGENTS_VIRAL_TRIAL'          = 'Power Virtual Agents Viral Trial'
+
+    # Microsoft Project
+    'PROJECT_P1'                                = 'Project Plan 1'
+    'PROJECT_P2'                                = 'Project Plan 3'
+    'PROJECT_P3'                                = 'Project Plan 5'
+    'PROJECTESSENTIALS'                         = 'Project Plan 1'
+    'PROJECTPROFESSIONAL'                       = 'Project Plan 3'
+    'PROJECTPREMIUM'                            = 'Project Plan 5'
+
+    # Microsoft Visio
+    'VISIO_PLAN1_DEP'                           = 'Visio Plan 1'
+    'VISIO_PLAN2_DEP'                           = 'Visio Plan 2'
+    'VISIOCLIENT'                               = 'Visio Plan 2'
+
+    # Microsoft 365 Copilot
+    'Copilot_Pro'                               = 'Microsoft Copilot Pro'
+    'Microsoft_365_Copilot'                     = 'Microsoft 365 Copilot'
+
+    # Developer
+    'DEVELOPERPACK'                             = 'Microsoft 365 E3 Developer'
+    'DEVELOPERPACK_E5'                          = 'Microsoft 365 E5 Developer'
+
+    # Yammer
+    'YAMMER_ENTERPRISE'                         = 'Yammer Enterprise'
+
+    # Microsoft Stream
+    'STREAM'                                    = 'Microsoft Stream (Classic)'
+
+    # Windows
+    'WIN10_PRO_ENT_SUB'                         = 'Windows 10/11 Enterprise E3'
+    'WIN10_ENT_A3_FAC'                          = 'Windows 10/11 Enterprise A3 for Faculty'
+    'WIN10_ENT_A3_STU'                          = 'Windows 10/11 Enterprise A3 for Students'
+
+    # Dynamics 365
+    'DYN365_ENTERPRISE_PLAN1'                   = 'Dynamics 365 Customer Engagement Plan'
+    'DYN365_ENTERPRISE_SALES'                   = 'Dynamics 365 Sales Enterprise'
+    'DYN365_ENTERPRISE_CUSTOMER_SERVICE'        = 'Dynamics 365 Customer Service Enterprise'
+    'DYN365_FINANCIALS_BUSINESS_SKU'            = 'Dynamics 365 Business Central Essential'
+
+    # Microsoft Viva
+    'VIVA'                                      = 'Microsoft Viva Suite'
+    'VIVA_INSIGHTS_P1'                          = 'Microsoft Viva Insights'
+}
+
+function Get-LicenseFriendlyName {
+    param([Parameter(Mandatory)][string]$SkuPartNumber)
+
+    if ($script:LicenseDisplayNames.ContainsKey($SkuPartNumber)) {
+        return $script:LicenseDisplayNames[$SkuPartNumber]
+    }
+
+    return $SkuPartNumber
+}
+
 function Write-Log {
     param(
         [Parameter(Mandatory)]
@@ -98,6 +271,7 @@ function Build-LicenseLookup {
     foreach ($sku in $skus) {
         $skuLookup[$sku.SkuId.ToString()] = [PSCustomObject]@{
             SkuPartNumber = $sku.SkuPartNumber
+            DisplayName   = Get-LicenseFriendlyName -SkuPartNumber $sku.SkuPartNumber
             ServicePlans  = $sku.ServicePlans
         }
     }
@@ -225,7 +399,7 @@ function New-LicenseUtilizationRows {
             }
 
             $sku = $SkuLookup[$skuId]
-            $assignedSkuNames.Add($sku.SkuPartNumber)
+            $assignedSkuNames.Add($sku.DisplayName)
             foreach ($servicePlan in $sku.ServicePlans) {
                 $allServicePlanNames.Add($servicePlan.ServicePlanName)
             }
