@@ -22,6 +22,7 @@ function Write-Log {
         [string]$Level = 'INFO'
     )
 
+    Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] [$Level] $Message"
     $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
     Write-Host "[$timestamp] [$Level] $Message"
 }
@@ -29,6 +30,7 @@ function Write-Log {
 function Ensure-Modules {
     param([switch]$SkipInstall)
 
+    $modules = @(
     $requiredModules = @(
         'Microsoft.Graph.Authentication',
         'Microsoft.Graph.Users',
@@ -37,6 +39,18 @@ function Ensure-Modules {
         'Microsoft.Graph.Reports'
     )
 
+    foreach ($moduleName in $modules) {
+        $installed = Get-Module -ListAvailable -Name $moduleName
+        if (-not $installed) {
+            if ($SkipInstall) {
+                throw "Required module '$moduleName' is missing and -SkipModuleInstall was used."
+            }
+
+            Write-Log "Installing module $moduleName"
+            Install-Module -Name $moduleName -Scope CurrentUser -AllowClobber -Force
+        }
+
+        Import-Module -Name $moduleName -ErrorAction Stop
     foreach ($module in $requiredModules) {
         if (-not (Get-Module -ListAvailable -Name $module)) {
             if ($SkipInstall) {
@@ -60,6 +74,15 @@ function Connect-M365Graph {
         'AuditLog.Read.All'
     )
 
+    Write-Log 'Connecting to Microsoft Graph. Please sign in with an admin account when prompted.'
+    Connect-MgGraph -Scopes $scopes -NoWelcome
+
+    $ctx = Get-MgContext
+    if (-not $ctx) {
+        throw 'Unable to establish Microsoft Graph context.'
+    }
+
+    Write-Log "Connected to tenant $($ctx.TenantId) as $($ctx.Account)"
     Write-Log 'Connecting to Microsoft Graph. Sign in with a Microsoft 365 admin account when prompted.'
     Connect-MgGraph -Scopes $scopes -NoWelcome
 
@@ -73,6 +96,8 @@ function Connect-M365Graph {
 
 function Get-GraphReportData {
     param(
+        [Parameter(Mandatory)][string]$Endpoint,
+        [Parameter(Mandatory)][string]$TempFile
         [Parameter(Mandatory)]
         [string]$Endpoint,
         [Parameter(Mandatory)]
