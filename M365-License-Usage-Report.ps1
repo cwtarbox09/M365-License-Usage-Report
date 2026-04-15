@@ -115,6 +115,7 @@ function Add-ReportKeyedHashtable {
 
     $result = @{}
     foreach ($row in $Rows) {
+        $key = Get-ReportValue -Row $row -CandidateProperties @($KeyProperty)
         $key = $row.$KeyProperty
         if (-not [string]::IsNullOrWhiteSpace($key)) {
             $result[$key.ToLowerInvariant()] = $row
@@ -152,6 +153,22 @@ function Get-ReportValue {
         return $null
     }
 
+    $allProperties = @($Row.PSObject.Properties)
+
+    foreach ($name in $CandidateProperties) {
+        $property = $allProperties | Where-Object { $_.Name -eq $name } | Select-Object -First 1
+        if ($property) {
+            return $property.Value
+        }
+
+        $normalizedTarget = ($name -replace '[^a-zA-Z0-9]', '').ToLowerInvariant()
+        $fallback = $allProperties |
+            Where-Object { (($_.Name -replace '[^a-zA-Z0-9]', '').ToLowerInvariant()) -eq $normalizedTarget } |
+            Select-Object -First 1
+
+        if ($fallback) {
+            return $fallback.Value
+        }
     foreach ($name in $CandidateProperties) {
         $property = $Row.PSObject.Properties[$name]
         if ($property) {
