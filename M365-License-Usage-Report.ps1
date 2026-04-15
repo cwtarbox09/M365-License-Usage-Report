@@ -270,7 +270,7 @@ function New-LicenseUtilizationRows {
             }
 
             $checkedSignals = @($mailboxActive, $oneDriveActive, $teamsActive, $intuneActive)
-            $activeSignalCount = ($checkedSignals | Where-Object { $_ }).Count
+            $activeSignalCount = @($checkedSignals | Where-Object { $_ }).Count
             $availableSignalCount = $signals.Count
 
             $utilizationState = if ($availableSignalCount -eq 0) {
