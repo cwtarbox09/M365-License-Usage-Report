@@ -142,6 +142,26 @@ function Test-RecentActivity {
     return $parsedDate -ge (Get-Date).AddDays(-1 * $LookbackDays)
 }
 
+function Get-ReportValue {
+    param(
+        [AllowNull()]$Row,
+        [Parameter(Mandatory)][string[]]$CandidateProperties
+    )
+
+    if (-not $Row) {
+        return $null
+    }
+
+    foreach ($name in $CandidateProperties) {
+        $property = $Row.PSObject.Properties[$name]
+        if ($property) {
+            return $property.Value
+        }
+    }
+
+    return $null
+}
+
 function Get-UserIntuneDeviceCounts {
     Write-Log 'Collecting Intune managed device inventory...'
 
@@ -203,6 +223,9 @@ function New-LicenseUtilizationRows {
 
             if ($hasExchangePlan) {
                 $signals.Add('Exchange')
+                $mailboxLastActivity = Get-ReportValue -Row $mailboxRow -CandidateProperties @('Last Activity Date','LastActivityDate')
+                $mailboxActive = Test-RecentActivity -DateValue $mailboxLastActivity -LookbackDays 30
+                $evidence.Add("ExchangeLastActivity=$mailboxLastActivity")
                 $mailboxActive = Test-RecentActivity -DateValue $mailboxRow.'Last Activity Date' -LookbackDays 30
                 $evidence.Add("ExchangeLastActivity=$($mailboxRow.'Last Activity Date')")
             }
@@ -212,6 +235,9 @@ function New-LicenseUtilizationRows {
 
             if ($hasSharePointPlan) {
                 $signals.Add('OneDrive/SharePoint')
+                $oneDriveLastActivity = Get-ReportValue -Row $oneDriveRow -CandidateProperties @('Last Activity Date','LastActivityDate')
+                $oneDriveActive = Test-RecentActivity -DateValue $oneDriveLastActivity -LookbackDays 30
+                $evidence.Add("OneDriveLastActivity=$oneDriveLastActivity")
                 $oneDriveActive = Test-RecentActivity -DateValue $oneDriveRow.'Last Activity Date' -LookbackDays 30
                 $evidence.Add("OneDriveLastActivity=$($oneDriveRow.'Last Activity Date')")
             }
@@ -221,6 +247,9 @@ function New-LicenseUtilizationRows {
 
             if ($hasTeamsPlan) {
                 $signals.Add('Teams')
+                $teamsLastActivity = Get-ReportValue -Row $teamsRow -CandidateProperties @('Last Activity Date','LastActivityDate')
+                $teamsActive = Test-RecentActivity -DateValue $teamsLastActivity -LookbackDays 30
+                $evidence.Add("TeamsLastActivity=$teamsLastActivity")
                 $teamsActive = Test-RecentActivity -DateValue $teamsRow.'Last Activity Date' -LookbackDays 30
                 $evidence.Add("TeamsLastActivity=$($teamsRow.'Last Activity Date')")
             }
